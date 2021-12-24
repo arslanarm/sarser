@@ -36,7 +36,7 @@ pub fn main() anyerror!void {
 + Optional values are consider as optional arguments.
 + Union types are allowed too. If you pass union type to `parse`, parser will assume that programm expects only one argument.
 + String arguments are allocated with the allocator and it is not parser's responsability to free strings of the value that is returned.
-+ You can add your own deserializers for types(overriding of default deserializers is possible with corner cases of `i'n'`, `u'n'`, `f'n'`)
++ You can add your own deserializers for types(overriding default deserializers is possible with corner cases of `i'n'`, `u'n'`, `f'n'`)
 
 ```
 const MyType = struct {
@@ -86,4 +86,4 @@ sarser.addTo(exe);
 
 ## Upcoming
 
-+ Currently, by default only `i32` and `f64` is supported. Adding support for any number type is necessary
++ Currently, by default only `i32` and `f64` are supported. Adding support for any number type is necessary
