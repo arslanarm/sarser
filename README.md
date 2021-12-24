@@ -7,7 +7,7 @@ consider using [zig-args](https://github.com/MasterQ32/zig-args).
 
 ## Usage
 
-```
+```zig
 const std = @import("std");
 const sarser = @import("sarser");
 
