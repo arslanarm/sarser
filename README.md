@@ -44,7 +44,7 @@ const MyType = struct {
     minutes: u8,
 };
 
-const MyTypeDeserializer = Deserializer {
+const MyTypeDeserializer = sarser.Deserializer(MyType) {
     .deserialize = parseMyType
 };
 fn parseMyType(_: std.mem.Allocator, str: []const u8) sarser.SarserError!MyType {
@@ -55,7 +55,6 @@ fn parseMyType(_: std.mem.Allocator, str: []const u8) sarser.SarserError!MyType 
         .hours = std.fmt.parseInt(u8, hoursStr, 10) catch { return sarser.SarserError.CannotDeserialize; },
         .minutes = std.fmt.parseInt(u8, minutesStr, 10) catch { return sarser.SarserError.CannotDeserialize; },
     };
-}
 }
 
 try parser.addCustomDeserializer(MyType, &MyTypeDeserializer);
