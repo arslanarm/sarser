@@ -38,7 +38,7 @@ pub fn main() anyerror!void {
 + String arguments are allocated with the allocator and it is not parser's responsability to free strings of the value that is returned.
 + You can add your own deserializers for types(overriding default deserializers is possible with corner cases of `i'n'`, `u'n'`, `f'n'`)
 
-```
+```zig
 const MyType = struct {
     hours: u8,
     minutes: u8,
@@ -69,7 +69,7 @@ std.log.info("{}", .{value});
 
 Library provides `addTo(step)` function for adding the package into your project. Follow the instruction to install the library
 
-```
+```zig
 ---------- bash ---------------
 
 git clone https://github.com/arslanarm/sarser/
