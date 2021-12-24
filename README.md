@@ -1,7 +1,7 @@
 # SARSER - Simple ARgument parSER
 
 Sarser is a library, purpose of which is to create a small cli programms with extremly simple api.
-Some functions of other argument parser libraries are not implemented purposfully. If you want a flexable library for parsing arguments
+Some functions of other argument parser libraries are not implemented purposefully. If you want a flexable library for parsing arguments
 consider using [zig-args](https://github.com/MasterQ32/zig-args).
 
 
