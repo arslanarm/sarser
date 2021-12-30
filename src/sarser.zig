@@ -1,12 +1,10 @@
 const std = @import("std");
 
 pub fn Deserializer(comptime T: type) type {
-    return struct {
-        deserialize: fn (std.mem.Allocator, []const u8) SarserError!T
-    };
-} 
+    return struct { deserialize: fn (std.mem.Allocator, []const u8) SarserError!T };
+}
 
-pub const SarserError = error { DeserializerNotFound, CannotDeserialize, NotEnoughArguments, OutOfMemory, CannotReadArgument, TooManyArguments };
+pub const SarserError = error{ DeserializerNotFound, CannotDeserialize, NotEnoughArguments, OutOfMemory, CannotReadArgument, TooManyArguments };
 
 pub const Sarser = struct {
     deserializers: std.StringHashMap(Deserializer(void)),
@@ -15,7 +13,7 @@ pub const Sarser = struct {
     // Inits the parser with the StringHashMap that will be used to store
     // deserializer for specific type. Deserializer for standard primitives can be overwritten
     pub fn init(allocator: std.mem.Allocator) !Sarser {
-        var parser = Sarser {
+        var parser = Sarser{
             .deserializers = std.StringHashMap(Deserializer(void)).init(allocator),
             .allocator = allocator,
         };
@@ -34,43 +32,52 @@ pub const Sarser = struct {
 
     // Gets a deserializer for a specific type or null if it doesn't exist
     pub fn getDeserializer(self: Sarser, comptime T: type) ?Deserializer(T) {
-        return @ptrCast(*?Deserializer(T), &self.deserializers.get(@typeName(T))).*;
+        return switch (@typeInfo(T)) {
+            .Int => IntDeserializer(T).init().deserializer,
+            .Float => FloatDeserializer(T).init().deserializer,
+            else => @ptrCast(*?Deserializer(T), &self.deserializers.get(@typeName(T))).*,
+        };
     }
 
     // Parses the std.process.args() with the struct, union
     pub fn parse(self: Sarser, comptime T: type) SarserError!T {
         var argsIter = std.process.args();
         _ = argsIter.skip();
-        
+
         var args = std.ArrayList([]const u8).init(self.allocator);
         defer args.deinit();
         defer deinitArrayList(self.allocator, args);
 
         var next = argsIter.next(self.allocator);
         while (next != null) : (next = argsIter.next(self.allocator)) {
-            const arg = (next.?) catch { return SarserError.CannotReadArgument; };
+            const arg = (next.?) catch {
+                return SarserError.CannotReadArgument;
+            };
             if (arg.len != 0) {
-                args.append(arg) catch { return SarserError.CannotReadArgument; };
+                args.append(arg) catch {
+                    return SarserError.CannotReadArgument;
+                };
             } else {
                 self.allocator.free(arg);
             }
         }
-        
+
         const result = switch (@typeInfo(T)) {
             .Struct => try self.parseFields(T, &args),
-            .Union => label:{
+            .Union => label: {
                 const t = try self.parseUnion(T, args.items[0]);
                 self.allocator.free(args.orderedRemove(0));
-                break:label t;
+                break :label t;
             },
-            else => { @compileError("Sarser: type " ++ @typeName(T) ++ " is not supported"); }
+            else => {
+                @compileError("Sarser: type " ++ @typeName(T) ++ " is not supported");
+            },
         };
-        
 
         if (args.items.len != 0) {
             return SarserError.TooManyArguments;
         }
-        
+
         return result;
     }
 
@@ -108,7 +115,7 @@ pub const Sarser = struct {
                             return SarserError.NotEnoughArguments;
                         }
                     },
-                    else => {}
+                    else => {},
                 }
                 if (!found) {
                     return SarserError.DeserializerNotFound;
@@ -143,7 +150,9 @@ pub const Sarser = struct {
                         return null;
                     }
                 },
-                else => { return SarserError.DeserializerNotFound; }
+                else => {
+                    return SarserError.DeserializerNotFound;
+                },
             }
         }
     }
@@ -152,65 +161,74 @@ pub const Sarser = struct {
         switch (@typeInfo(T)) {
             .Union => |un| {
                 inline for (un.fields) |field| {
-                    const deserializer = self.getDeserializer(field.field_type) orelse { return SarserError.DeserializerNotFound; };
-                    
-                    const value = deserializer.deserialize(self.allocator, str) catch |err| 
+                    const deserializer = self.getDeserializer(field.field_type) orelse {
+                        return SarserError.DeserializerNotFound;
+                    };
+
+                    const value = deserializer.deserialize(self.allocator, str) catch |err|
                         switch (err) {
-                            SarserError.CannotDeserialize => null,
-                            else => { return err; }
-                        };
+                        SarserError.CannotDeserialize => null,
+                        else => {
+                            return err;
+                        },
+                    };
                     if (value != null) {
                         return @unionInit(T, field.name, value.?);
                     }
                 }
                 return SarserError.CannotDeserialize;
             },
-            else => { unreachable(); }
+            else => {
+                unreachable();
+            },
         }
     }
 };
 
-
 fn addDefaultDeserializers(parser: *Sarser) !void {
-    try parser.addCustomDeserializer(i32, &IntDeserializer);
     try parser.addCustomDeserializer([]const u8, &StringDeserializer);
-    try parser.addCustomDeserializer(f64, &FloatDeserializer);
     try parser.addCustomDeserializer(bool, &BooleanDeserializer);
 }
 
-const IntDeserializer = Deserializer(i32) {
-    .deserialize = parseInt
-};
-fn parseInt(_: std.mem.Allocator, s: []const u8) SarserError!i32 {
-    return std.fmt.parseInt(i32, s, 10) catch SarserError.CannotDeserialize;
+fn IntDeserializer(comptime T: type) type {
+    return struct {
+        deserializer: Deserializer(T),
+        fn init() IntDeserializer(T) {
+            return IntDeserializer(T){
+                .deserializer = Deserializer(T){ .deserialize = parseInt },
+            };
+        }
+        fn parseInt(_: std.mem.Allocator, s: []const u8) SarserError!T {
+            return std.fmt.parseInt(T, s, 10) catch SarserError.CannotDeserialize;
+        }
+    };
 }
 
-
-const StringDeserializer = Deserializer([]const u8) {
-    .deserialize = parseString
-};
+const StringDeserializer = Deserializer([]const u8){ .deserialize = parseString };
 fn parseString(allocator: std.mem.Allocator, str: []const u8) SarserError![]const u8 {
-    var newStr = allocator.alloc(u8, str.len) catch { return SarserError.OutOfMemory; };
+    var newStr = allocator.alloc(u8, str.len) catch {
+        return SarserError.OutOfMemory;
+    };
     std.mem.copy(u8, newStr, str);
     return newStr;
 }
 
-const FloatDeserializer = Deserializer(f64) {
-    .deserialize = parseFloat
-};
-fn parseFloat(_: std.mem.Allocator, str: []const u8) SarserError!f64 {
-    return std.fmt.parseFloat(f64, str) catch SarserError.CannotDeserialize;
+fn FloatDeserializer(comptime T: type) type {
+    return struct {
+        deserializer: Deserializer(T),
+        fn init() FloatDeserializer(T) {
+            return FloatDeserializer(T){ .deserializer = Deserializer(T){ .deserialize = parseFloat } };
+        }
+        fn parseFloat(_: std.mem.Allocator, str: []const u8) SarserError!T {
+            return std.fmt.parseFloat(T, str) catch SarserError.CannotDeserialize;
+        }
+    };
 }
 
-const BooleanDeserializer = Deserializer(bool) {
-    .deserialize = parseBoolean
-};
+const BooleanDeserializer = Deserializer(bool){ .deserialize = parseBoolean };
 fn parseBoolean(_: std.mem.Allocator, str: []const u8) SarserError!bool {
-    return if (std.mem.eql(u8, str, "true")) true 
-        else if (std.mem.eql(u8, str, "false")) false
-        else SarserError.CannotDeserialize;
+    return if (std.mem.eql(u8, str, "true")) true else if (std.mem.eql(u8, str, "false")) false else SarserError.CannotDeserialize;
 }
-
 
 fn deinitArrayList(allocator: std.mem.Allocator, args: std.ArrayList([]const u8)) void {
     for (args.items) |item| {
@@ -224,14 +242,8 @@ test "check union" {
     var parser = try Sarser.init(allocator);
     defer parser.deinit();
 
-    const integer = try parser.parseUnion(union {
-        integer: i32,
-        float: f64
-    }, "123");
-     const float = try parser.parseUnion(union {
-        integer: i32,
-        float: f64
-    }, "123.0");
+    const integer = try parser.parseUnion(union { integer: i32, float: f64 }, "123");
+    const float = try parser.parseUnion(union { integer: i32, float: f64 }, "123.0");
     try std.testing.expect(integer.integer == 123);
     try std.testing.expect(float.float == 123.0);
 }
@@ -246,14 +258,9 @@ test "check struct" {
     try args.append(try allocator.dupe(u8, "yes"));
     try args.append(try allocator.dupe(u8, "--c=true"));
 
-    const value = try parser.parseFields(struct {
-        a: i32,
-        b: []const u8,
-        c: ?bool
-    }, &args);
+    const value = try parser.parseFields(struct { a: i32, b: []const u8, c: ?bool }, &args);
     try std.testing.expect(value.a == 123);
     try std.testing.expect(std.mem.eql(u8, value.b, "yes"));
     try std.testing.expect(value.c.?);
     allocator.free(value.b);
 }
-
