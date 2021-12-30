@@ -264,3 +264,21 @@ test "check struct" {
     try std.testing.expect(value.c.?);
     allocator.free(value.b);
 }
+
+test "check different integers and floats" {
+    const allocator = std.testing.allocator;
+    var parser = try Sarser.init(allocator);
+    defer parser.deinit();
+    var args = std.ArrayList([]const u8).init(allocator);
+    defer args.deinit();
+    try args.append(try allocator.dupe(u8, "123"));
+    try args.append(try allocator.dupe(u8, "9999999999"));
+    try args.append(try allocator.dupe(u8, "123.0"));
+    try args.append(try allocator.dupe(u8, "3456789.123"));
+
+    const value = try parser.parseFields(struct { a: u8, b: u128, c: f32, d: f64 }, &args);
+    try std.testing.expect(value.a == 123);
+    try std.testing.expect(value.b == 9999999999);
+    try std.testing.expect(value.c == 123.0);
+    try std.testing.expect(value.d == 3456789.123);
+}
