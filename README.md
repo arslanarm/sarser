@@ -85,4 +85,7 @@ sarser.addTo(exe);
 
 ## Upcoming
 
-+ Currently, by default only `i32` and `f64` are supported. Adding support for any number type is necessary
++ Add support for boolean fields to be parsed as optional arguments without value
++ Add aliasing
++ Add shortcut aliasing(Requirement = alias should must be only one character) => Allow to pass multiple shortcuts for booleans to tag them
+
